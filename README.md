@@ -7,11 +7,11 @@ Develop a deep learning neural network to replicate (clone) driving behavior. To
 The following files are included :
 - `model.py` Keras implementation of behavioral cloning model 
 - `sdc_lib.py` Helper functions for the behavioral cloning model 
-- `model.h5` Autonomous driving of behavioral model 
-- `run1.mp4` Video capture of utonomous driving of behavioral model 
+- `model.h5` Autonomous driving capture of the behavioral model 
+- `run1.mp4` Video capture of autonomous driving of the behavioral model 
 - `writeup_report` Detailed writeup of model creation and evaluation 
 - `sample_data_set` A sample of images from the data set 
-- `model_mse_loss.csv` Keras CSVLogger recording training output
+- `model_mse_loss.csv` Keras CSVLogger training output
 - `simple_clone_model.py` Very simple keras models for evaluating data set 
 
 The following steps are used to run the model:
