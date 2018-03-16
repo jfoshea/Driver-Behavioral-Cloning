@@ -15,7 +15,6 @@ from io import BytesIO
 from keras.models import load_model
 import h5py
 from keras import __version__ as keras_version
-# John O'Shea - imported cv2 for cv2.resize
 import cv2
 
 sio = socketio.Server()
@@ -63,13 +62,12 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
-        # John O'Shea - modify 2 lines below to match model: 
-        #   (1) Create ROI to match cropped images in the model
-        #   (2) Resize image to match Nvidia image size in the model 
-        #image_array = image_array[ 50:-20,: ]
-        #image_array = cv2.resize( image_array, (200, 66), interpolation=cv2.INTER_AREA )
+        # Crop and resize image to preserve same shape as training
+        image_array = image_array[40:-20,:]
+        image_array = cv2.resize(image_array, (200, 66), interpolation=cv2.INTER_AREA)
+        image_array = cv2.cvtColor( image_array, cv2.COLOR_RGB2YUV )
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
-
+        # Increase throttle when speed falls below 20mph (esp useful for track 2)
         throttle = controller.update(float(speed))
 
         print(steering_angle, throttle)

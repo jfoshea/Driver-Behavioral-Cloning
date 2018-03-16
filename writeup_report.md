@@ -1,7 +1,7 @@
 # Behavioral Cloning 
 
 ## Overview
-Develop a deep learning neural network to replicate (clone) driving behavior. To accomplish this a convolutional neural network (CNN) is developed to correctly steer a car along the road. Specifically the CNN will be trained using data from a specific track. Several iterative trials are run to evaluate how the model performs its autonomous driving task around the track. The model is improved and the data set is refined until the model successfully navagates the track without going off the road. The model is then run on another track to evaluate if the model has generalized enough to navigate any road succesfully. Many aspects of Keras, OpenCV, python, numpy, and matplotlib are used to develop the CNN. The model can be found here  [model.py](https://github.com/jfoshea/BehavioralCloning/blob/master/model.py)
+Develop a deep learning neural network to replicate (clone) driving behavior. To accomplish this a convolutional neural network (CNN) is developed to correctly steer a car along the road. Specifically the CNN will be trained using data from a specific track. Several iterative trials are run to evaluate how the model performs its autonomous driving task around the track. The model is improved and the data set is refined until the model successfully navagates the track without going off the road. The model is then run on another track to evaluate if the model has generalized enough to navigate any road succesfully. Many aspects of Keras, OpenCV, python, numpy, and matplotlib are used to develop the CNN. The model can be found here [model.py](https://github.com/jfoshea/BehavioralCloning/blob/master/model.py)
 
 The goals / steps of this project are the following:
 - Data Set Description.
@@ -36,8 +36,9 @@ The following techniques were implemented to enhance and pre-process the data se
 - Flipped images are added to augment the data set. This help generalize training and not memorize this specific track.
 - Steering measurements are added to augment the measurements. This helps the network to generalize training and not always steer to the left.  
 - Images are normalized for zero mean and equal variance using the suggested method `Lambda(lambda x: (x / 255.0) - 0.5)` within keras.
-- Images are cropped in Keras to exclude skyline and hood of the car which focuses training on the road. 
-- Histogram Equalization applied in an attempt to handle shadows. 
+- Images are cropped to exclude skyline and hood of the car which focuses training on the road. 
+- Random Brightness are added to augment the data set. Images with different brightness are achieved by first converting images to HSV, scaling up or down the V channel and converting back to the RGB channel. [Reference](https://chatbotslife.com/using-augmentation-to-mimic-human-driving-496b569760a9)
+- Images are finally converted from RGB to YUV as suggested in the Nvidia model.
  
 
 ### Model Design and Architecture
@@ -49,58 +50,53 @@ For this project I implemented three CNNs in Keras. The first one was a simple r
 
 ![Alt text](Nvidia_Model.png#center ) 
 
-The Nvidia model was the model of choice for this project as this was proven by Nvidia as a working model for behavioral cloning, so I decided to implement this CNN in Keras. For this project I seperated out the code into [model.py](https://github.com/jfoshea/BehavioralCloning/blob/master/model.py) and [sdc_lib.py](https://github.com/jfoshea/BehavioralCloning/blob/master/sdc_lib.py). The keras model is implemented in model.py, and I placed all helper functions in sdc_lib.py
+The Nvidia model [Nvidia Blog Post](https://devblogs.nvidia.com/deep-learning-self-driving-cars/)  was the model of choice for this project as this was proven by Nvidia as a working model for behavioral cloning, so I decided to implement this CNN in Keras. For this project I seperated out the code into [model.py](https://github.com/jfoshea/BehavioralCloning/blob/master/model.py) and [sdc_lib.py](https://github.com/jfoshea/BehavioralCloning/blob/master/sdc_lib.py). The keras model is implemented in model.py, and I placed all helper functions in sdc_lib.py
 
-The nvidia design used 66x200x3 sized images, but the simulator generates 160x320x3 images. My first inclination was to resize the simulator images to the suggessted Nvidia format as I felt this was optimal for training using the Nvidia model. To accomodate Nvidia sized images I used `model.add( ... ,input_shape = ( 66,200,3 ))` in keras, and used `cv2.resize( )` to resize each image to 66,200,3. The batch_generator also initialized a numpy array to the same dimenrsions. I also had to implement the `cv2.resize()` function in drive.py in order to run the simulator. However I found that after a few unsuccessful trials that the Nvidia sized images didnt seem to provide a noticeable advantage over the 160x320x3 simulator images, so I abandoned this effort and used default image sizes. The Nvidia paper also suggested using YUV colorspace, so I converted each RGB formatted image to YUV using `cv2.cvtColor( img, cv2.COLOR_RGB2YUV )`. Again I didnt see any advantage of YUV over RGB for track1, in fact I had better success with original RGB format.  The final model for this project has the following additions to the Nvidia model.
+The nvidia design used 66x200x3 sized images, but the simulator generates 160x320x3 images. My first inclination was to resize the simulator images to the suggessted Nvidia format as I felt this was optimal for training using the Nvidia model. To accomodate Nvidia sized images I used `model.add( ... ,input_shape = ( 66,200,3 ))` in keras, and used `cv2.resize( )` to resize each image to 66,200,3. The batch_generator also initialized a numpy array to the same dimenrsions.I also decided to use ELU(Exponential linear unit) which take care of the Vanishing gradient problem. I had many iterations in trainng the model, and had difficulty in reducing overfitting. I originally experimented with adding Dropouts after every layer which helped somewhat but the validation loss was still oscillating after about 5 epochs.I then added W_regularizers which are weight regularizers and are used to regularize the weights in the neural network, and this defintely helped with over fitting but I had to run for ~30 epochs to achieve this. The Nvidia paper also suggested using YUV colorspace, OpenCV has a function `cv2.cvtColor( img, cv2.COLOR_RGB2YUV )` to accomplish this. I didnt see any major advantage of YUV over RGB for track1.  The final model for this project has the following additions to the Nvidia model.
 - Normalization layer: This was added to normalize input images using Lamda function.
-- RELU Layers: These activation functions are added after each Convolution layer and act like ramp functions to address vanishing gradient problem.
-- Dropout Layer: This was added to avoid overfitting.
+- Weight Regularizer Layers.
+- ELU Layers.
+- Dropout Layers.
 
 The final model with modifications is as follows:
 
 | **Layer** | **Description**                                               
 |-----------|--------------- 
-| Input | 160x320x3 RGB image 
-| Cropping2D | Crops image to 90x320x3 (50 from top, 20 from bottom) 
-| Normalization | (pixel / 255.0) - 0.5)
+| Input | 66x200x3 RGB image 
+| Normalization | (pixel / 127.5) - 1.0)
 | Convolution2D | 5x5 kernel,2x2 stride, 24 outputs
-| RELU | REctified Linear Unit 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.2 
 | Convolution2D | 5x5 kernel,2x2 stride, 36 outputs
-| RELU | REctified Linear Unit 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.2 
 | Convolution2D | 5x5 kernel,2x2 stride, 48 outputs
-| RELU | REctified Linear Unit 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.2 
 | Convolution2D | 3x3 kernel,1x1 stride, 64 outputs
-| RELU | REctified Linear Unit 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.2 
 | Convolution2D | 3x3 kernel,1x1 stride, 64 outputs
-| RELU | REctified Linear Unit 
-| Dropout | dropout probability of 0.5 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.2 
 | Flatten | Input 4x33x64, Output 8448 
+| Dropout | dropout probability of 0.5 
 | Fully Connected | Input 100, Output 50 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.5 
 | Fully Connected | Input 50, Output 10 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.3 
 | Fully Connected | Input 10, Output 1 
+| ELU | Exponential Linear Unit 
+| Dropout | dropout probability of 0.3 
+| linear | Linear Activation Function 
 
 ### Model Training and Evaluation
 
-The keras model used the [Adam Optimizer](https://arxiv.org/abs/1412.6980v8) with the default learning rate = 0.001, and Mean Squared Error (MSE) was used as the loss function. I initially trained the model for 3 epochs without dropout layer. I noticed the validation loss was increasing for with successive epochs.
+The keras model used the [Adam Optimizer](https://arxiv.org/abs/1412.6980v8) with the default learning rate = 0.001, and Mean Squared Error (MSE) was used as the loss function. I initially trained the model for 3 epochs without dropout layer. I noticed the validation loss was increasing for with successive epochs. As discussed in the model section I added dropouts after every layer and also added W_regulizers along with ELU activations at each layer. After this I could see the validation loss steadily decrease, but I had to increase the number of epochs to 30. I do notice a slight increase in validation loss toward the end. I can add back in the early stop callback to prevent this, but overall the model trains and navigates the track successfully.  I enabled CSVLogger in Keras capture the validation loss during training. The CSV can be found here [model_mse_loss.csv](https://github.com/jfoshea/BehavioralCloning/blob/master/model_mse_loss.csv)
 
-**Model without Dropout**
-
-| **Loss** | **Validation Loss**                                               
-|----------|--------------------- 
-| loss: 0.4756 | val_loss: 0.0736
-| loss: 0.0172 | val_loss: 0.0292
-| loss: 0.0100 | val_loss: 0.0368
-
-I then experimented with adding a Dropout after each RELU activation layer and the Flatten layer. I could see the validation loss sometimes continually decreased and sometimes fluctuated. Increasing the number of epochs saw the loss continually decrease and the validation loss decrease but still fluctuate. I found that simply adding a dropout layer after the flatten layer was sufficient to help decreasing validation loss most of the time, but there is always some fluctuation.
-
-**Model with Dropout**
-
-| **Loss** | **Validation Loss**                                               
-|----------|--------------------- 
-| loss: 0.4260 | val_loss: 0.0542
-| loss: 0.0237 | val_loss: 0.0251
-| loss: 0.0294 | val_loss: 0.0213
 
 ### Conclusion
- This was a very intersting project and I spent a lot of time on this. It was frustrating at times between gathering good data and the numerous iterations through the simulator. I did successfully navigate track 1. I didnt have success yet on track 2. The big shadow throws the car off its track. In an attempt to solve this I added back in the  RGB to YUV conversion and then performed histogram equalization on the Y channel. However this needs more work and in fact didnt help for track1. I will investigate this more to figure out how to navigate track-2.
+ This was a very intersting project and I spent a lot of time on this. It was frustrating at times between gathering good data and the numerous iterations through the simulator. Two key items for success were removing the bias for driving straight, augment the steering angle for left and right cameras, and finding the correct model to avoid overfitting. In the end it was very satisfying to watch the self driving car navigate track several times. [run1.mp4](https://github.com/jfoshea/BehavioralCloning/blob/master/run1.mp4)
 

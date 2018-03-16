@@ -6,103 +6,95 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import random
-from enum import Enum
+from enum import IntEnum
 
-class Camera( Enum ): 
+class Camera( IntEnum ): 
     """ Enums for selecting a Camera """
     CENTER = 0
     LEFT   = 1
     RIGHT  = 2
 
-STEERING_ADJUST = 0.2
-
 def get_training_data( path ):
     """ Read csv file and extract data """
     image_names = []
-    steerings = []
+    steering_angles = []
     with open( path ) as csvfile:
         reader = csv.reader(csvfile)
         next( reader )
         for center,left,right,steering,throttle,brake,speed in reader:
-            #print("center = ",center)
             image_names.append( [ center.strip(), left.strip(), right.strip() ] )
-            steerings.append( float(steering) )
+            steering_angles.append( float( steering ) )
+    return image_names, steering_angles
 
-    return image_names, steerings
+def steering_adjust( camera_select, steering_angle ):
+    if camera_select == Camera.LEFT:
+        steering_angle = steering_angle + 0.25 
+    elif camera_select == Camera.RIGHT:
+        steering_angle = steering_angle - 0.25 
+    return steering_angle
 
-def flip_image( img ):
-   """ flip image """
-   return cv2.flip( img, 1 )
-
-def rotate_image( img, angle ):
-   """ Rotates an image using angle parameter """
-   img = img.copy()
-   img_mid = tuple( np.array( img.shape[0:2] ) / 2 )
-   rot_matrix = cv2.getRotationMatrix2D( img_mid, angle, 1.0 )
-   return cv2.warpAffine( img, rot_matrix, img.shape[0:2], flags=cv2.INTER_LINEAR )
-
-def translate_image( img, shift ):
-   """ Translate/Shift an image x,y direction """
-   img = img.copy()
-   trans_matrix = np.float32([ [1,0,shift], [0,1,shift] ])
-   return cv2.warpAffine( img, trans_matrix, img.shape[:2] )
-
-def rgb_to_yuv( img ):
-   """ Convert RGB to YUV format """
-   return cv2.cvtColor( img, cv2.COLOR_RGB2YUV )
-
-def equalize_y_channel( img ):
-    """Applies Histogram Equalization Y Channel to enhance contrast and shadows"""
-    img = img.copy()
-    img = cv2.cvtColor( img, cv2.COLOR_RGB2BGR )
-    img_yuv = cv2.cvtColor( img, cv2.COLOR_BGR2YUV )
-    # Equalize the histogram of the Y channel
-    img[:,:,0] = cv2.equalizeHist(img_yuv[:,:,0])
+def random_brightness( img ):
+    """ Add random brightness to help with varying lighting conditions  """
+    img = cv2.cvtColor( img, cv2.COLOR_RGB2HSV )
+    brightness = .25 + np.random.uniform()
+    img[:,:,2] = img[:,:,2] * brightness
+    img = cv2.cvtColor( img, cv2.COLOR_HSV2RGB )
     return img
 
-def process_sample( img, camera_select, steering, training_mode ):
-    """ 
-        1. Randomly adjust left and right cameras measurements
-        2. Randomly flip the camera image and reverse steering angle
-        3. Apply histogram equalization on Y channel 
-    """
-    if training_mode:
-        if camera_select == Camera.LEFT:
-            steering = steering + STEERING_ADJUST 
-        elif camera_select == Camera.RIGHT:
-            steering = steering - STEERING_ADJUST 
-        if random.choice( [0,1] ) == 1:
-            img = flip_image( img )
-            steering = -1.0 * steering 
+def resize_image( img ):
+    """ Crop and Resize to Nvidia format """
+    img = img[ 40:-20,: ]
+    img = cv2.resize( img, ( 200, 66 ), interpolation=cv2.INTER_AREA )
+    return img
 
-    #img = equalize_y_channel( img )
-    return img, steering
+def random_flip( img, steering_angle ):
+    """ Randomly flip an image and reverse steering """
+    if random.randrange( 2 ) == 1:
+        img = cv2.flip( img, 1 )
+        steering_angle = -steering_angle
+    return img, steering_angle 
 
-def batch_generator( X_train, y_train, path, batch_size, training_mode ):
-    """ Generator function to process data set in batches"""
+def rgb_to_yuv( img ):
+    """ Convert RGB to YUV format """
+    img = cv2.cvtColor( img, cv2.COLOR_RGB2YUV )
+    return img
 
-    num_samples = len( X_train )
-    images = np.zeros( ( batch_size, 160,320,3 ) )
-    steerings = np.zeros( ( batch_size, ), dtype=np.float32 )
+def process_image( img ):
+    """ Combine all image processing steps here """
+    img = random_brightness( img )
+    img = resize_image( img )
+    img = rgb_to_yuv( img )
+    return img
+
+def batch_generator( X, y, path, batch_size ):
+    image_batch = np.zeros( ( batch_size, 66, 200, 3 ), dtype=np.float32 )
+    steering_batch = np.zeros( ( batch_size, ), dtype=np.float32 )
 
     while 1:
-        for i in range( num_samples ):
-            image_samples = X_train[i:i+batch_size]
-            steering_samples = y_train[i:i+batch_size]
-            batch_samples = list( zip( image_samples, steering_samples ) )
+        steering_zero_count = 0
+        for i in range( batch_size ):
+            # Select a batch index and camera view at random 
+            batch_index = random.randrange( len( X ) )
+            camera_select = random.choice( range( len( Camera ) ) )
+            steering_angle = y[ batch_index ]
+            steering_angle = steering_adjust( camera_select, steering_angle )
 
-            for sample in ( batch_samples ):
-                camera_select = 0
-                if training_mode and random.choice( [0,1] ) == 1:
+            # Limit zero steering angle to half the batch  
+            if abs( steering_angle ) < 0.1:
+                steering_zero_count += 1
+            if steering_zero_count > ( batch_size * 0.5 ):
+                while abs( steering_angle ) < 0.1:
+                    batch_index = random.randrange( len( X ) )
                     camera_select = random.choice( range( len( Camera ) ) )
+                    steering_angle = y[ batch_index ]
+                    steering_angle = steering_adjust( camera_select, steering_angle )
+            img = mpimg.imread( path + X[ batch_index ][ camera_select ].split('/')[-1] )
+            img = process_image( img )
+            img = np.array( img, dtype=np.float32 )
+            img, steering_angle = random_flip( img, steering_angle )
 
-                img = mpimg.imread( path + sample[0][ camera_select ].split('/')[-1] )
-                steering = float( sample[1] )
+            image_batch[ i ] = img
+            steering_batch[ i ] = steering_angle
 
-                img,steering = process_sample( img, camera_select, steering, training_mode )
+        yield image_batch, steering_batch
 
-                img = np.array( img )
-                images[ i % batch_size ] = img
-                steerings[ i % batch_size ] = steering 
-
-            yield images, steerings 
