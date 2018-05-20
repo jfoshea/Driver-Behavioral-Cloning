@@ -21,7 +21,7 @@ The following steps are used to run the model:
     ```
 2. Clone the SDC-BehavioralCloning git repository
     ```  
-    $  git clone https://github.com/jfoshea/SDC-BehavioralCloning.git
+    $  git clone https://github.com/jfoshea/Driver-Behavioral-Cloning.git
     ```
 
 3. enable cardnd-term1 virtualenv
