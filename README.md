@@ -1,7 +1,7 @@
 # Behavioral Cloning 
 
 ## Overview
-Develop a deep learning neural network to replicate (clone) driving behavior. To accomplish this a convolutional neural network (CNN) is developed to correctly steer a car along the road. Specifically the CNN will be trained using data from a specific track. Many aspects of Keras, OpenCV, python, numpy, and matplotlib are used to develop the CNN. The model can be found here  [model.py](https://github.com/jfoshea/BehavioralCloning/blob/master/model.py)
+Develop a deep learning neural network to replicate (clone) driving behavior. To accomplish this a convolutional neural network (CNN) is developed to correctly steer a car along the road. Specifically the CNN will be trained using data from a specific track. Many aspects of Keras, OpenCV, python, numpy, and matplotlib are used to develop the CNN. The model can be found here  [model.py](https://github.com/jfoshea/Driver-Behavioral-Cloning/blob/master/model.py)
 
 ## Installing and Running the Classifier
 The following files are included :
@@ -39,5 +39,5 @@ The following steps are used to run the model:
     ```
 
 ## Writeup 
-A detailed writeup of the behavioral cloning project and challenges are located here [writeup_report] (https://github.com/jfoshea/SDC-BehavioralCloning/blob/master/writeup_report.md)
+A detailed writeup of the behavioral cloning project and challenges are located here [writeup_report] (https://github.com/jfoshea/Driver-Behavioral-Cloning/blob/master/writeup_report.md)
 
